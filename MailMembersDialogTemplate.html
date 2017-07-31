@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+<?!=include("OverlayCss")?>
+<style>
+  #table-container {
+    height: 425px;
+    width: 100%;
+    overflow: auto;
+  }
+  
+  #mail-container {
+    position:absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    z-index: 90;
+    background-color: #fff;
+    display: none;
+  }
+  
+  #mail-container .mail-body-container {
+    overflow: auto;
+    width: 100%;
+    height: 60%;
+    border: 1px solid #999;
+  }
+  
+  #mail-container .mail-subject {
+    width: 100%;
+    border: 1px solid #999;
+    padding: 2px;
+   
+  }
+  
+  #mail-container .mail-body {
+    width: 100%;
+    min-height: 100%;
+    padding: 2px;
+  }
+</style>
+</head>
+  <body>
+    <?!=include("OverlayHtml")?>
+    <div id="mail-container">
+      <div class="mail-subject-label mb-1">Emne</div>
+      <div class="mail-subject" contenteditable="true">
+      </div>
+      <div class="mail-body-label mb-1 mt-3">Indhold</div>
+      <div class="mail-body-container">
+        <div class="mail-body" contenteditable="true"></div>
+      </div>
+      <footer class="d-flex justify-content-between mt-5">
+        <button id="send_mail_btn" type="button" class="btn btn-primary">Send</button>
+        <button id="close_mail_btn" type="button" class="btn btn-info">Luk</button>
+      </footer>
+    </div>
+    <div>
+      <div id="table-container" class="mb-4">
+      <table class="table table-sm table-striped table-hover">
+        <thead>
+          <tr>
+            <th>Navn</th>
+            <th>E-mail</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
+      </div>
+      <footer class="d-flex justify-content-between">
+        <button id="compose_mail_btn" type="button" class="btn btn-primary" disabled>Skriv mail</button>
+        <button id="close_btn" type="button" class="btn btn-info">Luk</button>
+      </footer>
+    </div>
+  </body>
+</html>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script>
+  var sendMailTo = {};
+  
+  $(function() {
+    google.script.run.withSuccessHandler(function(data) {
+      var values = JSON.parse(data);
+      
+      if (values) {
+        for (var i = 1; i < values.length; i++) {
+          var row = values[i];
+          var name = row[2];
+          var mail = row[3];
+          var memberId = row[4];
+          var member = {
+              "id": memberId,
+              "name": name,
+              "mail": mail
+            };
+          var output = "<tr><td>" + name + "</td><td>" + mail + "</td><td><input id='" + memberId + "' type='checkbox' data-member='" + JSON.stringify(member) + "' /></td></tr>";
+          $("table tbody").append(output);
+        }
+      }
+      
+      $("table tbody").on("change", "input[type='checkbox']", function() {
+        var member = $(this).data("member");
+        var checked = $(this).prop("checked");
+        
+        if (!checked) {
+          if (sendMailTo.hasOwnProperty(member.id)) {
+            delete sendMailTo[member.id];
+          }
+        } else {
+          sendMailTo[member.id] = member;
+        }
+        
+        $("#compose_mail_btn").prop("disabled", !Object.keys(sendMailTo).length);
+      });
+    }).getAnswerSheetValues();
+  
+    $("#compose_mail_btn").click(function() {
+      $("#mail-container").show();
+    });
+  
+    $("#close_btn").click(function() {
+      google.script.host.close();
+    });
+    
+    $(".mail-subject, .mail-body").on("DOMCharacterDataModified", function(e) {
+      var sub = $(".mail-subject").text();
+      var body = $(".mail-body").text()
+      
+      $("#send_mail_btn").prop("disabled", sub && body?false:true);
+    });
+    
+    $("#close_mail_btn").click(function() {
+      $("#mail-container").hide();
+    });
+    
+    $("#send_mail_btn").click(function() {
+      $("#overlay").show();
+      var subject = $(".mail-subject").text();
+      var body = $(".mail-body").html();
+      
+      google.script.run.withSuccessHandler(function(success) {
+        $("#overlay").hide();
+        if (success) {
+          google.script.host.close();
+        } else {
+          
+        }  
+      }).sendMembersMail(sendMailTo, subject, body);
+    });
+  });
+</script>
